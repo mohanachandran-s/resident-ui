@@ -58,20 +58,34 @@ public class ResidentConfigManager extends UiConfigManager {
         bridgeScenarioToRun();
     }
 
+    /** Reads a key the same way ConfigManager.init()'s own generic fallback eventually will
+     *  (apitest-commons ConfigManager.getValueForKeyAddToPropertiesMap's else branch): an
+     *  environment variable (Rancher's actual config-injection mechanism for this module — plain
+     *  ConfigMap/Secret env vars, not a mounted file) wins over whatever resident.properties has
+     *  baked in. Must be duplicated here rather than just reading moduleProps, because both
+     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in. */
+    private static String resolveWithEnvOverride(Map<String, Object> moduleProps, String key) {
+        String envValue = System.getenv(key);
+        if (envValue != null) return envValue;
+        Object fileValue = moduleProps.get(key);
+        return fileValue == null ? null : (String) fileValue;
+    }
+
     /** Fails fast with every missing key named at once, instead of letting the suite run and
      *  crash minutes later with an unrelated-looking NPE the first time it reads one of these. */
     private static void validateRequiredConfig(Map<String, Object> moduleProps) {
         List<String> missing = new ArrayList<>();
         for (String key : REQUIRED_KEYS) {
-            Object value = moduleProps.get(key);
-            if (value == null || ((String) value).isBlank()) {
+            String value = resolveWithEnvOverride(moduleProps, key);
+            if (value == null || value.isBlank()) {
                 missing.add(key);
             }
         }
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
-                    "resident.properties is missing required value(s) for: " + String.join(", ", missing)
-                            + " - fill these in for your environment before running the suite "
+                    "Missing required config for: " + String.join(", ", missing)
+                            + " - set these as environment variables (Rancher ConfigMap/Secret) or in "
+                            + "resident.properties before running the suite "
                             + "(see ui-test/README.md's Setup section).");
         }
     }
@@ -84,9 +98,9 @@ public class ResidentConfigManager extends UiConfigManager {
      *  passed directly still wins over the derived value. */
     private static void bridgeEnvEndpoint(Map<String, Object> moduleProps) {
         if (System.getProperty("env.endpoint") != null) return;
-        Object apiInternalEndPoint = moduleProps.get("apiInternalEndPoint");
-        if (apiInternalEndPoint != null && !((String) apiInternalEndPoint).isBlank()) {
-            System.setProperty("env.endpoint", ((String) apiInternalEndPoint).trim());
+        String apiInternalEndPoint = resolveWithEnvOverride(moduleProps, "apiInternalEndPoint");
+        if (apiInternalEndPoint != null && !apiInternalEndPoint.isBlank()) {
+            System.setProperty("env.endpoint", apiInternalEndPoint.trim());
         }
     }
 
