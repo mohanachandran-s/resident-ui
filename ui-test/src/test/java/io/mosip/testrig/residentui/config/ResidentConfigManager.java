@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -28,6 +30,14 @@ public class ResidentConfigManager extends UiConfigManager {
 
     private static final Logger logger = LoggerFactory.getLogger(ResidentConfigManager.class);
 
+    // resident.properties ships tracked with these blank — every one is read downstream (page
+    // navigation, Keycloak auth for identity generation) with no further fallback, so a blank
+    // value otherwise surfaces as a cryptic NPE deep inside apitest-commons/uitest-commons
+    // instead of a clear "fill this in" message.
+    private static final List<String> REQUIRED_KEYS = List.of(
+            "baseUrl", "apiInternalEndPoint", "keycloak-external-url",
+            "mosip_idrepo_client_secret", "mosip_admin_client_secret", "mosip_testrig_client_secret");
+
     public static void init() {
         Map<String, Object> moduleProps = new HashMap<>();
         // Layer 2: uitest-commons UI defaults — loaded first so later layers override them
@@ -38,6 +48,7 @@ public class ResidentConfigManager extends UiConfigManager {
         moduleProps.putAll(loadProperties("config/resident.properties"));
         moduleProps.putAll(loadProperties("config/bioValue.properties"));
 
+        validateRequiredConfig(moduleProps);
         bridgeEnvEndpoint(moduleProps);
 
         // ConfigManager.init(): loads Kernel.properties first (layer 1), then putAll(moduleProps)
@@ -45,6 +56,24 @@ public class ResidentConfigManager extends UiConfigManager {
         ConfigManager.init(moduleProps);
 
         bridgeScenarioToRun();
+    }
+
+    /** Fails fast with every missing key named at once, instead of letting the suite run and
+     *  crash minutes later with an unrelated-looking NPE the first time it reads one of these. */
+    private static void validateRequiredConfig(Map<String, Object> moduleProps) {
+        List<String> missing = new ArrayList<>();
+        for (String key : REQUIRED_KEYS) {
+            Object value = moduleProps.get(key);
+            if (value == null || ((String) value).isBlank()) {
+                missing.add(key);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(
+                    "resident.properties is missing required value(s) for: " + String.join(", ", missing)
+                            + " - fill these in for your environment before running the suite "
+                            + "(see ui-test/README.md's Setup section).");
+        }
     }
 
     /** ConfigManager.init() derives eSignetbaseurl/signupBaseUrl/injiCertifyBaseURL from the JVM
