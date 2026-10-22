@@ -4,10 +4,11 @@ set -e
 java --version
 mvn --version
 
-# Rancher mounts the equivalent of resident.properties (URLs, secrets, UIN/VID test data) as a
-# ConfigMap/Secret file — not baked into the image, since it's gitignored and holds real
-# credentials. Drop it where Maven's own resource handling already expects it, so `mvn test`
-# picks it up exactly like a local run reading src/test/resources/config/resident.properties.
+# The image only ever bakes in resident.properties' tracked, blank/default values (never real
+# secrets/URLs — see that file's own header). Rancher mounts the real one (URLs, secrets, UIN/VID
+# test data) as a ConfigMap/Secret file instead; drop it where Maven's own resource handling
+# already expects it, so `mvn test` picks it up exactly like a local run reading
+# src/test/resources/config/resident.properties.
 RESIDENT_CONFIG_PATH="${RESIDENT_CONFIG_PATH:-/home/mosip/config/resident.properties}"
 if [ -f "$RESIDENT_CONFIG_PATH" ]; then
     cp "$RESIDENT_CONFIG_PATH" src/test/resources/config/resident.properties

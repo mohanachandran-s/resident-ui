@@ -228,6 +228,18 @@
 						<include>**/ResidentTestRunner.java</include>
 					</includes>
 				</configuration>
+				<!-- Surefire resolves its test-framework provider (surefire-junit-platform, here)
+				     dynamically at execution time, outside normal dependency resolution, so
+				     `mvn dependency:go-offline` (used at Docker build time to pre-warm this image's
+				     .m2 for later offline `mvn -o test`) never sees it. Declaring it explicitly as a
+				     plugin dependency puts it back in the normal graph. -->
+				<dependencies>
+					<dependency>
+						<groupId>org.apache.maven.surefire</groupId>
+						<artifactId>surefire-junit-platform</artifactId>
+						<version>3.2.5</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 
 			<plugin>
