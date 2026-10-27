@@ -101,6 +101,13 @@ public class ResidentConfigManager extends UiConfigManager {
             String value = resolveWithEnvOverride(moduleProps, key);
             if (value == null || value.isBlank()) {
                 missing.add(key);
+            } else {
+                // Write the resolved value back so ConfigManager.init(moduleProps) — and anything
+                // downstream reading config through it, e.g. apitest-commons' Keycloak-admin-client
+                // bootstrap — sees it too. Without this, a value that only resolved via the -D
+                // system property fallback (see resolveWithEnvOverride) never reaches moduleProps,
+                // so ConfigManager.init() still only sees resident.properties' blank default.
+                moduleProps.put(key, value);
             }
         }
         if (!missing.isEmpty()) {
