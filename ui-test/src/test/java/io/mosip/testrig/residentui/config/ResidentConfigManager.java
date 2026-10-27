@@ -65,13 +65,7 @@ public class ResidentConfigManager extends UiConfigManager {
      *  environment variable (Rancher's actual config-injection mechanism for this module — plain
      *  ConfigMap/Secret env vars, not a mounted file) wins over whatever resident.properties has
      *  baked in. Must be duplicated here rather than just reading moduleProps, because both
-     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in.
-     *
-     *  Runs as a plain `java -jar` process (see MainRunner) rather than through Maven/Surefire, so
-     *  this JVM inherits the container's real OS environment directly — no bridging needed for
-     *  hyphenated names like keycloak-external-url the way a Surefire-forked JVM would (Surefire
-     *  reconstructs its fork's environment by shelling out to `env` and regex-parsing
-     *  C-identifier-style KEY= lines, silently dropping hyphenated ones). */
+     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in. */
     private static String resolveWithEnvOverride(Map<String, Object> moduleProps, String key) {
         String envValue = System.getenv(key);
         if (envValue != null) return envValue;
