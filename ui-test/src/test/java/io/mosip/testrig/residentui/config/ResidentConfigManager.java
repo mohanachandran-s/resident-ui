@@ -76,6 +76,15 @@ public class ResidentConfigManager extends UiConfigManager {
     private static void validateRequiredConfig(Map<String, Object> moduleProps) {
         List<String> missing = new ArrayList<>();
         for (String key : REQUIRED_KEYS) {
+            // Logs presence/absence only, never the actual value (some of these are secrets) —
+            // lets a failed run's log answer "did the env var actually reach this container"
+            // without needing to exec into the pod separately.
+            String envValue = System.getenv(key);
+            Object fileValue = moduleProps.get(key);
+            logger.info("Config check for '{}': env={}, resident.properties={}", key,
+                    envValue == null ? "<unset>" : (envValue.isBlank() ? "<blank>" : "<set>"),
+                    fileValue == null ? "<unset>" : (((String) fileValue).isBlank() ? "<blank>" : "<set>"));
+
             String value = resolveWithEnvOverride(moduleProps, key);
             if (value == null || value.isBlank()) {
                 missing.add(key);
