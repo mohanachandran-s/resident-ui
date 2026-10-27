@@ -63,10 +63,21 @@ public class ResidentConfigManager extends UiConfigManager {
      *  environment variable (Rancher's actual config-injection mechanism for this module — plain
      *  ConfigMap/Secret env vars, not a mounted file) wins over whatever resident.properties has
      *  baked in. Must be duplicated here rather than just reading moduleProps, because both
-     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in. */
+     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in.
+     *
+     *  A -D system property of the same (possibly hyphenated) name is checked next, below the raw
+     *  env var but above the file: Maven/Surefire's forked test JVM doesn't reliably inherit
+     *  hyphenated environment variable names (confirmed in Rancher — keycloak-external-url is
+     *  present in the container's own env per `kubectl exec printenv`, yet System.getenv() inside
+     *  the forked JVM reports it unset, while every underscore/camelCase-named key survives fine).
+     *  entrypoint.sh works around this for keycloak-external-url by reading it via `printenv` and
+     *  passing it through to `mvn` as -Dkeycloak-external-url=..., which travels via the JVM's
+     *  command-line args rather than this env-reconstruction path. */
     private static String resolveWithEnvOverride(Map<String, Object> moduleProps, String key) {
         String envValue = System.getenv(key);
         if (envValue != null) return envValue;
+        String sysPropValue = System.getProperty(key);
+        if (sysPropValue != null) return sysPropValue;
         Object fileValue = moduleProps.get(key);
         return fileValue == null ? null : (String) fileValue;
     }
@@ -80,9 +91,11 @@ public class ResidentConfigManager extends UiConfigManager {
             // lets a failed run's log answer "did the env var actually reach this container"
             // without needing to exec into the pod separately.
             String envValue = System.getenv(key);
+            String sysPropValue = System.getProperty(key);
             Object fileValue = moduleProps.get(key);
-            logger.info("Config check for '{}': env={}, resident.properties={}", key,
+            logger.info("Config check for '{}': env={}, sysProp={}, resident.properties={}", key,
                     envValue == null ? "<unset>" : (envValue.isBlank() ? "<blank>" : "<set>"),
+                    sysPropValue == null ? "<unset>" : (sysPropValue.isBlank() ? "<blank>" : "<set>"),
                     fileValue == null ? "<unset>" : (((String) fileValue).isBlank() ? "<blank>" : "<set>"));
 
             String value = resolveWithEnvOverride(moduleProps, key);
