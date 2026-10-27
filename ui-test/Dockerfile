@@ -47,23 +47,22 @@ RUN groupadd -g ${container_user_gid} ${container_user_group} \
 USER ${container_user_uid}:${container_user_gid}
 WORKDIR ${work_dir}
 
-# Source only — no fat jar. The suite runs via `mvn test` (Surefire → JUnit5 Platform →
-# ResidentTestRunner → Cucumber), same as a local run; there's no standalone executable jar
-# for this suite the way the old Selenium TestRunner.main() used to provide.
+# Builds a self-contained executable jar (MainRunner, driving the JUnit Platform Launcher
+# directly) rather than shipping source for `mvn test` to compile/run at container start. Running
+# the suite as a single `java -jar` process means it inherits the container's real OS environment
+# directly — no Maven/Surefire fork in between to lose hyphenated Rancher-injected env var names
+# like keycloak-external-url (Surefire reconstructs its forked JVM's environment by shelling out
+# to `env` and regex-parsing C-identifier-style KEY= lines, which silently drops those). See
+# ResidentConfigManager.resolveWithEnvOverride() and MainRunner for the full rationale.
 COPY --chown=${container_user_uid}:${container_user_group} pom.xml ${work_dir}
 COPY --chown=${container_user_uid}:${container_user_group} src/ ${work_dir}src/
 COPY --chown=${container_user_uid}:${container_user_group} entrypoint.sh ${work_dir}
 
-# Resolves and caches all dependencies (including uitest-commons/apitest-commons) into this
-# image's own .m2, and compiles the test sources, so a container start only has to run the
-# suite, not resolve the internet first. Requires uitest-commons to actually be published and
-# reachable at build time — see uitestrig-platform/pom.xml's distributionManagement.
-#
-# Runs the actual `test` goal (not just `test-compile`) with skipTests so Surefire's own
-# test-framework provider (surefire-junit-platform) gets resolved into .m2 too — that provider is
-# looked up dynamically at execution time, outside normal dependency resolution, so neither
-# `test-compile` nor `dependency:go-offline` ever fetch it; skipTests=true means no real test
-# classes execute, so no resident.properties config is needed at build time.
-RUN mvn -B test -DskipTests=true -Dgpg.skip=true
+# skipTests=true: these "tests" are live Playwright scenarios against a real MOSIP environment —
+# there's no config to run them against at build time, only at container start. package still
+# compiles everything and runs the assembly plugin, producing target/*-jar-with-dependencies.jar.
+# Requires uitest-commons to actually be published and reachable at build time — see
+# uitestrig-platform/pom.xml's distributionManagement.
+RUN mvn -B package -DskipTests=true -Dgpg.skip=true
 
 ENTRYPOINT ["/bin/bash", "./entrypoint.sh"]

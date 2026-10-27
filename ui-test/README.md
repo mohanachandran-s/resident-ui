@@ -43,10 +43,12 @@ docker run -e RESIDENT_CONFIG_PATH=/home/mosip/config/resident.properties \
   uitest-resident
 ```
 
-The image has no fat jar or `main()` — it builds the test sources at image-build time
-(`mvn test-compile`) and runs `mvn -o test` at container start. `entrypoint.sh` copies the mounted
-config file into the source tree's expected location before running, so Rancher deployments inject
-config via a mounted ConfigMap/Secret rather than environment variables.
+The image builds a self-contained executable jar at build time (`mvn package` — `MainRunner`
+driving the JUnit Platform Launcher directly, see `AGENTS.md`) and runs it with `java -jar` at
+container start; no Maven/Surefire invocation happens at runtime. In production, Rancher injects
+config entirely through plain environment variables (ConfigMaps/Secrets) — the
+`RESIDENT_CONFIG_PATH` mount above is a local/Docker convenience only; `ResidentConfigManager`
+reads that file directly if present.
 
 ## Configuration
 
@@ -64,7 +66,9 @@ there if it's genuinely absent upstream, blank upstream, or an intentional overr
 ## Architecture
 
 1. `ResidentTestRunner` (`runner/`) — JUnit5 `@Suite` entry point; no code, just annotations
-   selecting the Cucumber engine and the `features/` classpath resource.
+   selecting the Cucumber engine and the `features/` classpath resource. `MainRunner` is the
+   production entry point — it runs this suite via the JUnit Platform Launcher API directly
+   (`java -jar`, no Maven/Surefire fork).
 2. `ResidentHooks` (`hooks/`) — suite lifecycle: loads config, initializes test data, staggers each
    parallel worker's first scenario, and delegates reporting/teardown to `uitest-commons`.
 3. Cucumber runs each `.feature` file's scenarios against step definitions in `steps/`, which drive
