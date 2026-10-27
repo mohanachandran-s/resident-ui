@@ -40,12 +40,11 @@ docker run -e RESIDENT_CONFIG_PATH=/home/mosip/config/resident.properties \
 ```
 The image builds a self-contained executable jar at build time (`mvn package` — `MainRunner`
 driving the JUnit Platform Launcher directly, see Architecture below) and runs it with `java -jar`
-at container start; no Maven/Surefire invocation happens at runtime, so this JVM inherits the
-container's real OS environment directly (no forked-process env reconstruction to lose a
-hyphenated key like `keycloak-external-url`). In production, Rancher injects config entirely
-through plain environment variables (ConfigMaps/Secrets) — the `RESIDENT_CONFIG_PATH` mount above
-is a local/Docker convenience only; `ResidentConfigManager` reads that file directly if present
-(it can't be baked into the jar and overwritten the way entrypoint.sh used to under `mvn test`).
+at container start; no Maven/Surefire invocation happens at runtime (see `MainRunner` for why that
+matters). In production, Rancher injects config entirely through plain environment variables
+(ConfigMaps/Secrets) — the `RESIDENT_CONFIG_PATH` mount above is a local/Docker convenience only;
+`ResidentConfigManager` reads that file directly if present (it can't be baked into the jar and
+overwritten the way entrypoint.sh used to under `mvn test`).
 
 ## Configuration
 

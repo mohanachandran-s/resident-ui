@@ -9,14 +9,10 @@ if [ -z "$JAR_PATH" ]; then
     exit 1
 fi
 
-# Runs as a single `java -jar` process (MainRunner, via the JUnit Platform Launcher — no
-# Maven/Surefire fork), so it inherits the container's real OS environment directly, including
-# hyphenated Rancher-injected vars like keycloak-external-url that a Surefire fork would silently
-# drop. See ResidentConfigManager.resolveWithEnvOverride() for the full rationale. A mounted config
-# file (RESIDENT_CONFIG_PATH, default /home/mosip/config/resident.properties — unused by Rancher in
-# production, which configures this module entirely via env vars, but documented for local/Docker
-# runs) is read directly by ResidentConfigManager, not copied here, since that classpath resource
-# is frozen inside the jar at build time.
+# A mounted config file (RESIDENT_CONFIG_PATH, default /home/mosip/config/resident.properties —
+# unused by Rancher in production, which configures this module entirely via env vars, but
+# documented for local/Docker runs) is read directly by ResidentConfigManager, not copied here,
+# since that classpath resource is frozen inside the jar at build time.
 #
 # exec replaces this shell with the java process, so it receives Kubernetes' signals directly.
 # Exit code propagates MainRunner's own (non-zero on any test failure), so Rancher sees a failed

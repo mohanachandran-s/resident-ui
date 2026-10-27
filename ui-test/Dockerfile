@@ -48,12 +48,8 @@ USER ${container_user_uid}:${container_user_gid}
 WORKDIR ${work_dir}
 
 # Builds a self-contained executable jar (MainRunner, driving the JUnit Platform Launcher
-# directly) rather than shipping source for `mvn test` to compile/run at container start. Running
-# the suite as a single `java -jar` process means it inherits the container's real OS environment
-# directly — no Maven/Surefire fork in between to lose hyphenated Rancher-injected env var names
-# like keycloak-external-url (Surefire reconstructs its forked JVM's environment by shelling out
-# to `env` and regex-parsing C-identifier-style KEY= lines, which silently drops those). See
-# ResidentConfigManager.resolveWithEnvOverride() and MainRunner for the full rationale.
+# directly) rather than shipping source for `mvn test` to compile/run at container start. See
+# MainRunner for why this runs as a single `java -jar` process instead of through Maven/Surefire.
 COPY --chown=${container_user_uid}:${container_user_group} pom.xml ${work_dir}
 COPY --chown=${container_user_uid}:${container_user_group} src/ ${work_dir}src/
 COPY --chown=${container_user_uid}:${container_user_group} entrypoint.sh ${work_dir}

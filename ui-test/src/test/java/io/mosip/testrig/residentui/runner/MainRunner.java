@@ -19,9 +19,8 @@ import java.io.PrintWriter;
  * `env` and regex-parsing C-identifier-style KEY= lines — a hyphenated Rancher-injected variable
  * like keycloak-external-url doesn't match that regex and silently drops, even though every
  * underscore/camelCase-named variable survives. Running as a single `java -jar` process instead
- * means this JVM inherits the container's real OS environment directly; System.getenv() sees
- * every injected key correctly with no bridging needed, exactly like apitest-resident's own
- * `java -jar` entrypoint.
+ * means this JVM inherits the container's real OS environment directly, with no such fork in
+ * between — exactly like apitest-resident's own `java -jar` entrypoint.
  */
 public class MainRunner {
 
