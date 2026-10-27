@@ -1,12 +1,6 @@
 #!/bin/bash
 set -e
 
-# Temporary diagnostic: pinpointing where keycloak-external-url disappears between the pod's
-# actual env (confirmed present via `kubectl exec -- printenv`) and the JVM reading it via
-# System.getenv() deep in the mvn/surefire fork chain. Remove once resolved.
-echo "DIAG entrypoint.sh sees keycloak-external-url: $(printenv keycloak-external-url || echo '<printenv exit nonzero / unset>')"
-echo "DIAG entrypoint.sh env var count: $(printenv | wc -l)"
-
 java --version
 mvn --version
 
@@ -23,6 +17,21 @@ else
     echo "No mounted config found at $RESIDENT_CONFIG_PATH — falling back to whatever's baked into the image (if anything)."
 fi
 
+# Maven/Surefire's forked test JVM doesn't reliably inherit hyphenated environment variable names
+# (confirmed in Rancher: keycloak-external-url is present in the container's own env, but
+# System.getenv() inside the forked JVM reports it unset, while every underscore/camelCase key
+# survives fine — a known plexus-utils/Commandline quirk reconstructing the forked env via `env` +
+# a C-identifier-style KEY= regex that hyphenated names don't match). Bash can't reference it as
+# $keycloak-external-url either (hyphens aren't valid in a bash variable name), so read it via
+# printenv and hand it to the JVM as a system property instead, which travels via the command-line
+# args array rather than that env-reconstruction path. ResidentConfigManager.resolveWithEnvOverride()
+# reads it back via System.getProperty().
+KEYCLOAK_EXTERNAL_URL_ARG=()
+keycloak_external_url_value="$(printenv keycloak-external-url || true)"
+if [ -n "$keycloak_external_url_value" ]; then
+    KEYCLOAK_EXTERNAL_URL_ARG=("-Dkeycloak-external-url=$keycloak_external_url_value")
+fi
+
 # -o: dependencies were already resolved into this image's .m2 at build time.
 # Exit code propagates mvn's own (non-zero on any test failure), so Rancher sees a failed Job.
-mvn -o test -Dgpg.skip=true
+mvn -o test -Dgpg.skip=true "${KEYCLOAK_EXTERNAL_URL_ARG[@]}"
