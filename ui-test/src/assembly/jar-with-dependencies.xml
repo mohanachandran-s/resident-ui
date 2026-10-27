@@ -7,10 +7,18 @@
     </formats>
     <includeBaseDirectory>false</includeBaseDirectory>
 
-    <!-- Everything this suite actually runs lives under src/test (steps, pages, hooks, config,
-         MainRunner) and uitest-commons is a test-scope dependency — there's no src/main content
-         worth shipping, so the test output and test-scope dependency graph are the whole jar. -->
+    <!-- Most of what this suite runs lives under src/test (steps, pages, hooks, config,
+         MainRunner), but src/main/resources/config/Authorization/*.json (request templates
+         KernelAuthentication loads from the classpath by name, e.g. "config/Authorization/
+         request.json") and src/main/resources/config/application.properties are also required at
+         runtime. Under plain `mvn test`, both target/classes and target/test-classes land on the
+         test classpath automatically; this assembly has to list both explicitly or the fat jar
+         silently drops everything under src/main. -->
     <fileSets>
+        <fileSet>
+            <directory>${project.build.outputDirectory}</directory>
+            <outputDirectory>/</outputDirectory>
+        </fileSet>
         <fileSet>
             <directory>${project.build.testOutputDirectory}</directory>
             <outputDirectory>/</outputDirectory>
