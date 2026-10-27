@@ -1,0 +1,53 @@
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.3 http://maven.apache.org/xsd/assembly-1.1.3.xsd">
+    <id>jar-with-dependencies</id>
+    <formats>
+        <format>jar</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <!-- Everything this suite actually runs lives under src/test (steps, pages, hooks, config,
+         MainRunner) and uitest-commons is a test-scope dependency — there's no src/main content
+         worth shipping, so the test output and test-scope dependency graph are the whole jar. -->
+    <fileSets>
+        <fileSet>
+            <directory>${project.build.testOutputDirectory}</directory>
+            <outputDirectory>/</outputDirectory>
+        </fileSet>
+    </fileSets>
+
+    <dependencySets>
+        <dependencySet>
+            <!-- Assembly plugin's "test" scope resolves the full compile+runtime+test graph —
+                 everything this module and uitest-commons actually need at runtime. -->
+            <scope>test</scope>
+            <useProjectArtifact>false</useProjectArtifact>
+            <unpack>true</unpack>
+            <outputDirectory>/</outputDirectory>
+            <excludes>
+                <!-- Only ever needed to satisfy a compile-time interface for sqlite-jdbc's
+                     native-image module; no runtime use. -->
+                <exclude>org.graalvm.nativeimage:svm</exclude>
+            </excludes>
+            <unpackOptions>
+                <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                </excludes>
+            </unpackOptions>
+        </dependencySet>
+    </dependencySets>
+
+    <!-- Multiple dependency jars each register their own ServiceLoader provider under
+         META-INF/services/org.junit.platform.engine.TestEngine (junit-platform-suite-engine for
+         @Suite, cucumber-junit-platform-engine for @IncludeEngines("cucumber")) — without this
+         merge handler, unpacking plainly overwrites one file with the other and only one engine
+         survives, breaking discovery of either the suite or the scenarios inside it. -->
+    <containerDescriptorHandlers>
+        <containerDescriptorHandler>
+            <handlerName>metaInf-services</handlerName>
+        </containerDescriptorHandler>
+    </containerDescriptorHandlers>
+</assembly>

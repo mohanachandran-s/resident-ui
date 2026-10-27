@@ -6,6 +6,8 @@ import io.mosip.testrig.uitestrig.listeners.CucumberHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,7 +47,7 @@ public class ResidentConfigManager extends UiConfigManager {
         // Layer 3: default identity field values (dateOfBirth, email, phone, postalCode, ...)
         moduleProps.putAll(loadProperties("config/valueMapping.properties"));
         // Layer 4: module-specific overrides
-        moduleProps.putAll(loadProperties("config/resident.properties"));
+        moduleProps.putAll(loadResidentProperties());
         moduleProps.putAll(loadProperties("config/bioValue.properties"));
 
         validateRequiredConfig(moduleProps);
@@ -65,19 +67,14 @@ public class ResidentConfigManager extends UiConfigManager {
      *  baked in. Must be duplicated here rather than just reading moduleProps, because both
      *  callers below run *before* ConfigManager.init() ever merges that env-var layer in.
      *
-     *  A -D system property of the same (possibly hyphenated) name is checked next, below the raw
-     *  env var but above the file: Maven/Surefire's forked test JVM doesn't reliably inherit
-     *  hyphenated environment variable names (confirmed in Rancher — keycloak-external-url is
-     *  present in the container's own env per `kubectl exec printenv`, yet System.getenv() inside
-     *  the forked JVM reports it unset, while every underscore/camelCase-named key survives fine).
-     *  entrypoint.sh works around this for keycloak-external-url by reading it via `printenv` and
-     *  passing it through to `mvn` as -Dkeycloak-external-url=..., which travels via the JVM's
-     *  command-line args rather than this env-reconstruction path. */
+     *  Runs as a plain `java -jar` process (see MainRunner) rather than through Maven/Surefire, so
+     *  this JVM inherits the container's real OS environment directly — no bridging needed for
+     *  hyphenated names like keycloak-external-url the way a Surefire-forked JVM would (Surefire
+     *  reconstructs its fork's environment by shelling out to `env` and regex-parsing
+     *  C-identifier-style KEY= lines, silently dropping hyphenated ones). */
     private static String resolveWithEnvOverride(Map<String, Object> moduleProps, String key) {
         String envValue = System.getenv(key);
         if (envValue != null) return envValue;
-        String sysPropValue = System.getProperty(key);
-        if (sysPropValue != null) return sysPropValue;
         Object fileValue = moduleProps.get(key);
         return fileValue == null ? null : (String) fileValue;
     }
@@ -91,23 +88,14 @@ public class ResidentConfigManager extends UiConfigManager {
             // lets a failed run's log answer "did the env var actually reach this container"
             // without needing to exec into the pod separately.
             String envValue = System.getenv(key);
-            String sysPropValue = System.getProperty(key);
             Object fileValue = moduleProps.get(key);
-            logger.info("Config check for '{}': env={}, sysProp={}, resident.properties={}", key,
+            logger.info("Config check for '{}': env={}, resident.properties={}", key,
                     envValue == null ? "<unset>" : (envValue.isBlank() ? "<blank>" : "<set>"),
-                    sysPropValue == null ? "<unset>" : (sysPropValue.isBlank() ? "<blank>" : "<set>"),
                     fileValue == null ? "<unset>" : (((String) fileValue).isBlank() ? "<blank>" : "<set>"));
 
             String value = resolveWithEnvOverride(moduleProps, key);
             if (value == null || value.isBlank()) {
                 missing.add(key);
-            } else {
-                // Write the resolved value back so ConfigManager.init(moduleProps) — and anything
-                // downstream reading config through it, e.g. apitest-commons' Keycloak-admin-client
-                // bootstrap — sees it too. Without this, a value that only resolved via the -D
-                // system property fallback (see resolveWithEnvOverride) never reaches moduleProps,
-                // so ConfigManager.init() still only sees resident.properties' blank default.
-                moduleProps.put(key, value);
             }
         }
         if (!missing.isEmpty()) {
@@ -142,6 +130,38 @@ public class ResidentConfigManager extends UiConfigManager {
             System.setProperty(CucumberHooks.SCENARIO_FILTER_PROPERTY, scenarioToRun.trim());
             logger.info("Running a single scenario (scenarioToRun): {}", scenarioToRun.trim());
         }
+    }
+
+    // Rancher deployments configure this module entirely via env vars (confirmed in production —
+    // no mounted config is ever found), but local/Docker runs document mounting a real
+    // resident.properties over this classpath-baked, blank-default one (see README.md). Since
+    // this module now ships as a self-contained jar (see MainRunner), that classpath resource is
+    // frozen inside the jar at build time — entrypoint.sh can no longer override it by copying a
+    // file into a source tree that no longer exists at runtime. Reading the external file here
+    // instead keeps that documented workflow working.
+    private static final String DEFAULT_RESIDENT_CONFIG_PATH = "/home/mosip/config/resident.properties";
+
+    private static Map<String, Object> loadResidentProperties() {
+        Map<String, Object> props = loadProperties("config/resident.properties");
+
+        String externalPath = System.getenv("RESIDENT_CONFIG_PATH");
+        if (externalPath == null || externalPath.isBlank()) {
+            externalPath = DEFAULT_RESIDENT_CONFIG_PATH;
+        }
+        File externalFile = new File(externalPath);
+        if (externalFile.isFile()) {
+            Properties external = new Properties();
+            try (InputStream in = new FileInputStream(externalFile)) {
+                external.load(in);
+                logger.info("Loaded mounted config from {} — {} properties", externalPath, external.size());
+            } catch (IOException e) {
+                logger.error("Failed to load mounted config from {}: {}", externalPath, e.getMessage());
+            }
+            for (String key : external.stringPropertyNames()) {
+                props.put(key, external.getProperty(key));
+            }
+        }
+        return props;
     }
 
     private static Map<String, Object> loadProperties(String resourcePath) {
