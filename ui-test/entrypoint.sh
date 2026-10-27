@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Temporary diagnostic: pinpointing where keycloak-external-url disappears between the pod's
+# actual env (confirmed present via `kubectl exec -- printenv`) and the JVM reading it via
+# System.getenv() deep in the mvn/surefire fork chain. Remove once resolved.
+echo "DIAG entrypoint.sh sees keycloak-external-url: $(printenv keycloak-external-url || echo '<printenv exit nonzero / unset>')"
+echo "DIAG entrypoint.sh env var count: $(printenv | wc -l)"
+
 java --version
 mvn --version
 
