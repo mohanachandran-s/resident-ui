@@ -57,7 +57,7 @@ public class ResidentConfigManager extends UiConfigManager {
         // so layers 2-4 override Kernel; env vars (layer 5) override everything inside init().
         ConfigManager.init(moduleProps);
 
-        bridgeScenarioToRun();
+        bridgeScenarioToRun(moduleProps);
     }
 
     /** Reads a key the same way ConfigManager.init()'s own generic fallback eventually will
@@ -115,11 +115,21 @@ public class ResidentConfigManager extends UiConfigManager {
         }
     }
 
-    /** Bridges resident.properties' scenarioToRun into the system property CucumberHooks reads.
-     *  A -DscenarioToRun=... passed directly on the command line still wins over the file. */
-    private static void bridgeScenarioToRun() {
+    /** Bridges a scenarioToRun override into the system property CucumberHooks reads. A
+     *  -DscenarioToRun=... passed directly on the command line still wins over everything else.
+     *
+     *  Deliberately uses {@link #resolveWithEnvOverride} rather than {@code getproperty()}:
+     *  apitest-commons' ConfigManager.getproperty() is a plain map lookup with no generic
+     *  env-var fallback — only a hardcoded list of specific keys (eSignetbaseurl,
+     *  serverErrorsToMonitor, ...) ever get checked against the environment inside
+     *  ConfigManager.init(). "scenarioToRun" isn't one of them and isn't declared in any
+     *  .properties file either, so getproperty("scenarioToRun") always silently returned "" —
+     *  a plain `scenarioToRun` env var (the only override mechanism Rancher actually has,
+     *  since it injects config purely via env vars, not mounted files or -D flags) was never
+     *  being read at all. */
+    private static void bridgeScenarioToRun(Map<String, Object> moduleProps) {
         if (System.getProperty(CucumberHooks.SCENARIO_FILTER_PROPERTY) != null) return;
-        String scenarioToRun = getproperty("scenarioToRun");
+        String scenarioToRun = resolveWithEnvOverride(moduleProps, "scenarioToRun");
         if (scenarioToRun != null && !scenarioToRun.isBlank()) {
             System.setProperty(CucumberHooks.SCENARIO_FILTER_PROPERTY, scenarioToRun.trim());
             logger.info("Running a single scenario (scenarioToRun): {}", scenarioToRun.trim());
