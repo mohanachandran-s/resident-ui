@@ -8,6 +8,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.mosip.testrig.apirig.utils.NotificationListener;
+import io.mosip.testrig.residentui.core.ResidentGlobalConstants;
 import io.mosip.testrig.residentui.hooks.ResidentTestData;
 import io.mosip.testrig.uitestrig.browser.PlaywrightFactory;
 import io.mosip.testrig.uitestrig.assertions.VisualValidator;
@@ -160,8 +161,8 @@ public class CommonSteps {
         page().locator("#UINservices").click();
         UiExtentReportManager.logStepWithLocator("Click 'Login with OTP'", "#login_with_otp");
         page().locator("#login_with_otp").click();
-        UiExtentReportManager.logStepWithLocator("Enter the VID/UIN", "#Otp_mosip-vid");
-        page().locator("#Otp_mosip-vid").fill(vid);
+        UiExtentReportManager.logStepWithLocator("Enter the VID/UIN", ResidentGlobalConstants.LOGIN_VID_INPUT);
+        page().locator(ResidentGlobalConstants.LOGIN_VID_INPUT).fill(vid);
         NotificationListener.markRequestStart();
         requestOtpWithRetry();
 
