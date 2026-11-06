@@ -10,13 +10,15 @@ ARG TARGETARCH
 # standard +/-1 minor version skew; bump alongside the cluster's own upgrades.
 ARG KUBECTL_VERSION=v1.29.9
 
-# Maven isn't bundled in the Playwright base image. kubectl and jq are required because the
-# uitestrig Helm chart (mosip-functional-tests) overrides this container's entrypoint to run
-# fetch_docker_image_hash_ids.sh before ever invoking entrypoint.sh below — that script shells
-# out to kubectl to record this pod's own image hash (exiting 1 if missing, so the suite never
-# starts) and pipes a cluster-wide image inventory through jq.
+# kubectl and jq are required because the uitestrig Helm chart (mosip-functional-tests) overrides
+# this container's entrypoint to run fetch_docker_image_hash_ids.sh before ever invoking
+# entrypoint.sh below — that script shells out to kubectl to record this pod's own image hash
+# (exiting 1 if missing, so the suite never starts) and pipes a cluster-wide image inventory
+# through jq. No Maven here: the jar is built once in CI (build-maven-uitest-resident) and handed
+# to this build already-packaged (see COPY below) rather than rebuilt inside the image — running
+# `mvn package` cold on every platform this image builds for used to be most of this build's time.
 RUN apt-get update && \
-    apt-get install -y maven curl ca-certificates jq && \
+    apt-get install -y curl ca-certificates jq && \
     curl -fLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl && \
@@ -47,18 +49,12 @@ RUN groupadd -g ${container_user_gid} ${container_user_group} \
 USER ${container_user_uid}:${container_user_gid}
 WORKDIR ${work_dir}
 
-# Builds a self-contained executable jar (MainRunner, driving the JUnit Platform Launcher
-# directly) rather than shipping source for `mvn test` to compile/run at container start. See
-# MainRunner for why this runs as a single `java -jar` process instead of through Maven/Surefire.
-COPY --chown=${container_user_uid}:${container_user_group} pom.xml ${work_dir}
-COPY --chown=${container_user_uid}:${container_user_group} src/ ${work_dir}src/
+# Self-contained executable jar (MainRunner, driving the JUnit Platform Launcher directly) —
+# built once in CI with a warm Maven cache and copied in ready-to-run, rather than shipping
+# source for `mvn package` to compile/assemble again inside the image. See MainRunner for why
+# this runs as a single `java -jar` process instead of through Maven/Surefire, and entrypoint.sh
+# for how it locates this jar.
+COPY --chown=${container_user_uid}:${container_user_group} target/*-jar-with-dependencies.jar ${work_dir}target/
 COPY --chown=${container_user_uid}:${container_user_group} entrypoint.sh ${work_dir}
-
-# skipTests=true: these "tests" are live Playwright scenarios against a real MOSIP environment —
-# there's no config to run them against at build time, only at container start. package still
-# compiles everything and runs the assembly plugin, producing target/*-jar-with-dependencies.jar.
-# Requires uitest-commons to actually be published and reachable at build time — see
-# uitestrig-platform/pom.xml's distributionManagement.
-RUN mvn -B package -DskipTests=true -Dgpg.skip=true
 
 ENTRYPOINT ["/bin/bash", "./entrypoint.sh"]
