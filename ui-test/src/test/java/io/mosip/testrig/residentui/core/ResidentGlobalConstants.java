@@ -25,7 +25,7 @@ public class ResidentGlobalConstants {
     // ── Authentication / login ─────────────────────────────────────────────────
     public static final String LOGIN_UIN_SERVICES_BTN = "#UINservices";
     public static final String LOGIN_WITH_OTP_BTN     = "#login_with_otp";
-    public static final String LOGIN_VID_INPUT        = "#Otp_mosip-vid";
+    public static final String LOGIN_VID_INPUT        = "input[id$='vid']";
     public static final String GET_OTP_BTN            = "#get_otp";
     public static final String LOGIN_GET_OTP_BTN      = GET_OTP_BTN;
     public static final String LOGIN_OTP_INPUT_WRAPPER = "#otp_verify_input";
