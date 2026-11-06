@@ -221,10 +221,8 @@ public class CommonSteps {
             UiExtentReportManager.logStep("Login successful");
         } catch (RuntimeException e) {
             // Unlike BasePage's helpers, these calls go straight through the raw Playwright
-            // locator API with no per-call try/catch, so without this the real exception
-            // (locator timeout, rejected OTP, etc.) never reached the report — teardownScenario's
-            // generic "Scenario failed" line was the only trace. Report against whichever step was
-            // last logged, since that's the one that was in flight when this was thrown.
+            // locator API with no per-call try/catch. Report against whichever step was last
+            // logged, since that's the one that was in flight when this was thrown.
             captureLoginFailure(e);
             throw e;
         }

@@ -123,10 +123,9 @@ public class ResidentConfigManager extends UiConfigManager {
      *  env-var fallback — only a hardcoded list of specific keys (eSignetbaseurl,
      *  serverErrorsToMonitor, ...) ever get checked against the environment inside
      *  ConfigManager.init(). "scenarioToRun" isn't one of them and isn't declared in any
-     *  .properties file either, so getproperty("scenarioToRun") always silently returned "" —
-     *  a plain `scenarioToRun` env var (the only override mechanism Rancher actually has,
-     *  since it injects config purely via env vars, not mounted files or -D flags) was never
-     *  being read at all. */
+     *  .properties file either, so getproperty("scenarioToRun") would always return "" —
+     *  resolveWithEnvOverride() is what actually lets Rancher's env-var-only config injection
+     *  reach this key. */
     private static void bridgeScenarioToRun(Map<String, Object> moduleProps) {
         if (System.getProperty(CucumberHooks.SCENARIO_FILTER_PROPERTY) != null) return;
         String scenarioToRun = resolveWithEnvOverride(moduleProps, "scenarioToRun");
