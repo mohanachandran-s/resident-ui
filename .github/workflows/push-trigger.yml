@@ -80,10 +80,6 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
 
   build-docker-uitest-resident:
-    # Reuses the jar build-maven-uitest-resident already built and uploaded (as "uitest-resident")
-    # instead of rebuilding the identical module from scratch a second time — there used to be a
-    # separate build-uitest-resident-local job here that did exactly that, purely to re-upload the
-    # same jars under a different artifact name.
     needs: build-maven-uitest-resident
     strategy:
       matrix:
