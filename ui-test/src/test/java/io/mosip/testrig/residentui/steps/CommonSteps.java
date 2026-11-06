@@ -17,6 +17,8 @@ import io.mosip.testrig.uitestrig.reporting.UiExtentReportManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Base64;
+
 /**
  * Shared Cucumber step definitions: login, logout, popup dismissal.
  */
@@ -157,65 +159,91 @@ public class CommonSteps {
     void performOtpLogin(String vid) {
         logger.info("Performing OTP login with VID ...{}", vid.length() > 4 ? vid.substring(vid.length() - 4) : "****");
 
-        UiExtentReportManager.logStepWithLocator("Click the UIN/VID login trigger", "#UINservices");
-        page().locator("#UINservices").click();
-        UiExtentReportManager.logStepWithLocator("Click 'Login with OTP'", "#login_with_otp");
-        page().locator("#login_with_otp").click();
-        UiExtentReportManager.logStepWithLocator("Enter the VID/UIN", ResidentGlobalConstants.LOGIN_VID_INPUT);
-        page().locator(ResidentGlobalConstants.LOGIN_VID_INPUT).fill(vid);
-        NotificationListener.markRequestStart();
-        requestOtpWithRetry();
-
-        // Login OTP can still go to the original email even after Update My Data switches
-        // loginEmail to a new one — poll both rather than assume which one the backend used.
-        String otp = ResidentTestData.getOtpFromCurrentOrPreviousEmail();
-        NotificationListener.markRequestRemove();
-        if (otp == null || otp.isEmpty()) {
-            throw new IllegalStateException("OTP not received for " + ResidentTestData.loginEmail
-                    + (ResidentTestData.previousLoginEmail.isBlank() ? "" : " or " + ResidentTestData.previousLoginEmail));
-        }
-
-        UiExtentReportManager.logStepWithLocator("Enter the OTP", "#otp_verify_input div input");
-        Locator inputs = page().locator("#otp_verify_input div input");
-        for (int i = 0; i < otp.length() && i < inputs.count(); i++) {
-            inputs.nth(i).fill(String.valueOf(otp.charAt(i)));
-        }
-
-        UiExtentReportManager.logStepWithLocator("Click 'Verify OTP'", "#verify_otp");
-        page().locator("#verify_otp").click();
-        page().waitForLoadState(LoadState.NETWORKIDLE);
-
-        // First-time OAuth consent (shown only once per VID+app pair). A sibling <div> overlays
-        // the real checkbox and intercepts clicks, hence evaluate("el => el.click()") instead
-        // of a regular click().
-        Locator consentCheckbox = page().locator("#authorize_scope");
         try {
-            consentCheckbox.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(10_000));
-            UiExtentReportManager.logStepWithLocator("Accept the OAuth consent", "#authorize_scope");
-            consentCheckbox.evaluate("el => el.click()");
-            page().locator("#voluntary_claims").evaluate("el => el.click()");
-            page().locator("#continue").click();
+            UiExtentReportManager.logStepWithLocator("Click the UIN/VID login trigger", "#UINservices");
+            page().locator("#UINservices").click();
+            UiExtentReportManager.logStepWithLocator("Click 'Login with OTP'", "#login_with_otp");
+            page().locator("#login_with_otp").click();
+            UiExtentReportManager.logStepWithLocator("Enter the VID/UIN", ResidentGlobalConstants.LOGIN_VID_INPUT);
+            page().locator(ResidentGlobalConstants.LOGIN_VID_INPUT).fill(vid);
+            NotificationListener.markRequestStart();
+            requestOtpWithRetry();
+
+            // Login OTP can still go to the original email even after Update My Data switches
+            // loginEmail to a new one — poll both rather than assume which one the backend used.
+            String otp = ResidentTestData.getOtpFromCurrentOrPreviousEmail();
+            NotificationListener.markRequestRemove();
+            if (otp == null || otp.isEmpty()) {
+                throw new IllegalStateException("OTP not received for " + ResidentTestData.loginEmail
+                        + (ResidentTestData.previousLoginEmail.isBlank() ? "" : " or " + ResidentTestData.previousLoginEmail));
+            }
+
+            UiExtentReportManager.logStepWithLocator("Enter the OTP", "#otp_verify_input div input");
+            Locator inputs = page().locator("#otp_verify_input div input");
+            for (int i = 0; i < otp.length() && i < inputs.count(); i++) {
+                inputs.nth(i).fill(String.valueOf(otp.charAt(i)));
+            }
+
+            UiExtentReportManager.logStepWithLocator("Click 'Verify OTP'", "#verify_otp");
+            page().locator("#verify_otp").click();
             page().waitForLoadState(LoadState.NETWORKIDLE);
-        } catch (Exception e) {
-            logger.debug("No first-time consent screen this run — continuing");
-        }
 
-        // Can take a while to open for a freshly-generated identity's first login.
-        Locator dismiss = page().locator("#dismissBtn");
+            // First-time OAuth consent (shown only once per VID+app pair). A sibling <div> overlays
+            // the real checkbox and intercepts clicks, hence evaluate("el => el.click()") instead
+            // of a regular click().
+            Locator consentCheckbox = page().locator("#authorize_scope");
+            try {
+                consentCheckbox.waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(10_000));
+                UiExtentReportManager.logStepWithLocator("Accept the OAuth consent", "#authorize_scope");
+                consentCheckbox.evaluate("el => el.click()");
+                page().locator("#voluntary_claims").evaluate("el => el.click()");
+                page().locator("#continue").click();
+                page().waitForLoadState(LoadState.NETWORKIDLE);
+            } catch (Exception e) {
+                logger.debug("No first-time consent screen this run — continuing");
+            }
+
+            // Can take a while to open for a freshly-generated identity's first login.
+            Locator dismiss = page().locator("#dismissBtn");
+            try {
+                dismiss.waitFor(new Locator.WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(60_000));
+                UiExtentReportManager.logStepWithLocator("Dismiss the login-success popup", "#dismissBtn");
+                dismiss.click();
+            } catch (Exception e) {
+                logger.warn("Login-success popup (#dismissBtn) did not appear within 60s — continuing");
+            }
+
+            logger.info("Login successful");
+            UiExtentReportManager.logStep("Login successful");
+        } catch (RuntimeException e) {
+            // Unlike BasePage's helpers, these calls go straight through the raw Playwright
+            // locator API with no per-call try/catch, so without this the real exception
+            // (locator timeout, rejected OTP, etc.) never reached the report — teardownScenario's
+            // generic "Scenario failed" line was the only trace. Report against whichever step was
+            // last logged, since that's the one that was in flight when this was thrown.
+            captureLoginFailure(e);
+            throw e;
+        }
+    }
+
+    /** Mirrors BasePage's captureFailure() — CommonSteps issues raw Playwright calls instead of
+     *  going through a page object, so it needs its own copy of the same capture-and-report. */
+    private void captureLoginFailure(Throwable error) {
+        String description = UiExtentReportManager.getLastStepDescription();
+        String locator = UiExtentReportManager.getLastStepLocator();
+        String screenshotBase64 = null;
         try {
-            dismiss.waitFor(new Locator.WaitForOptions()
-                    .setState(WaitForSelectorState.VISIBLE)
-                    .setTimeout(60_000));
-            UiExtentReportManager.logStepWithLocator("Dismiss the login-success popup", "#dismissBtn");
-            dismiss.click();
+            screenshotBase64 = Base64.getEncoder().encodeToString(
+                    page().screenshot(new Page.ScreenshotOptions().setFullPage(true)));
         } catch (Exception e) {
-            logger.warn("Login-success popup (#dismissBtn) did not appear within 60s — continuing");
+            logger.warn("Could not capture failure screenshot: {}", e.getMessage());
         }
-
-        logger.info("Login successful");
-        UiExtentReportManager.logStep("Login successful");
+        UiExtentReportManager.logFailureWithScreenshot(
+                description != null ? description : "OTP login failed", locator, error, screenshotBase64);
     }
 
     /**
