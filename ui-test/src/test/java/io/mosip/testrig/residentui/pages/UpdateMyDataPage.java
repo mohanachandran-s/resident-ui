@@ -2,6 +2,7 @@ package io.mosip.testrig.residentui.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import io.mosip.testrig.uitestrig.pages.BasePage;
 import io.mosip.testrig.uitestrig.assertions.VisualValidator;
@@ -11,12 +12,19 @@ import io.mosip.testrig.uitestrig.core.MosipTestDataManager;
 import io.mosip.testrig.uitestrig.core.UiConfigManager;
 import org.apache.commons.lang3.RandomStringUtils;
 
-import java.nio.file.Paths;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 
 public class UpdateMyDataPage extends BasePage {
 
     private final VisualValidator visual;
-    private static final String UPLOAD_FILE = "src/test/resources/BulkUploadFiles/tonyId.png";
+    // Loaded from the classpath, not a filesystem path: resolving "src/test/resources/..." relative
+    // to the JVM's working directory only works under mvn test/IDE, where that directory still
+    // exists — not when running the packaged jar (Docker/Rancher), whose working directory has no
+    // src/ tree. The file is already on the classpath either way (Maven copies it under
+    // target/test-classes, which the fat jar bundles), so reading it that way works everywhere.
+    private static final String UPLOAD_FILE_RESOURCE = "/BulkUploadFiles/tonyId.png";
 
     public UpdateMyDataPage(Page page) {
         super(page);
@@ -113,7 +121,18 @@ public class UpdateMyDataPage extends BasePage {
     public void fillProofOfIdentity() {
         fill("#proofOfIdentityvalue", ResidentTestData.testLabel(), "Enter the Proof of Identity document name");
         openAndPickFirstOption("#proofOfIdentity");
-        page.setInputFiles("#fileDropRef", Paths.get(UPLOAD_FILE));
+        page.setInputFiles("#fileDropRef", loadUploadFilePayload());
+    }
+
+    private FilePayload loadUploadFilePayload() {
+        try (InputStream in = UpdateMyDataPage.class.getResourceAsStream(UPLOAD_FILE_RESOURCE)) {
+            if (in == null) {
+                throw new IllegalStateException("Classpath resource not found: " + UPLOAD_FILE_RESOURCE);
+            }
+            return new FilePayload("tonyId.png", "image/png", in.readAllBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
@@ -161,7 +180,7 @@ public class UpdateMyDataPage extends BasePage {
         selectDropdownFirstOption("[id='Postal Code']");
         selectDropdownFirstOption("#proofOfAddress");
         fill("#proofOfAddressvalue", ResidentTestData.testLabel(), "Enter the Proof of Address document name");
-        page.setInputFiles("#fileAddRef", Paths.get(UPLOAD_FILE));
+        page.setInputFiles("#fileAddRef", loadUploadFilePayload());
     }
 
     private void selectDropdownFirstOption(String selector) {
