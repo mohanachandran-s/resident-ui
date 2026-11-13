@@ -209,7 +209,7 @@
 							</descriptors>
 							<archive>
 								<manifest>
-									<mainClass>io.mosip.testrig.residentui.runner.MainRunner</mainClass>
+									<mainClass>io.mosip.testrig.residentui.runner.ResidentTestRunner</mainClass>
 								</manifest>
 							</archive>
 						</configuration>

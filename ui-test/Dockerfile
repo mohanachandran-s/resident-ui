@@ -44,7 +44,7 @@ RUN groupadd -g ${container_user_gid} ${container_user_group} \
 USER ${container_user_uid}:${container_user_gid}
 WORKDIR ${work_dir}
 
-# Self-contained executable jar (see MainRunner) — built once in CI, not here.
+# Self-contained executable jar (see ResidentTestRunner.main()) — built once in CI, not here.
 COPY --chown=${container_user_uid}:${container_user_group} target/*-jar-with-dependencies.jar ${work_dir}target/
 COPY --chown=${container_user_uid}:${container_user_group} entrypoint.sh ${work_dir}
 
