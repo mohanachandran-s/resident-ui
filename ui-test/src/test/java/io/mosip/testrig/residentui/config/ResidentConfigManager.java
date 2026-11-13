@@ -32,9 +32,7 @@ public class ResidentConfigManager extends UiConfigManager {
 
     private static final Logger logger = LoggerFactory.getLogger(ResidentConfigManager.class);
 
-    // resident.properties ships tracked with these blank — every one is read downstream (page
-    // navigation, Keycloak auth for identity generation) with no further fallback, so a blank
-    // value otherwise surfaces as a cryptic NPE deep inside apitest-commons/uitest-commons
+    // Every key here is read downstream with no fallback — blank surfaces as a cryptic NPE
     // instead of a clear "fill this in" message.
     private static final List<String> REQUIRED_KEYS = List.of(
             "baseUrl", "apiInternalEndPoint", "keycloak-external-url",
@@ -60,12 +58,9 @@ public class ResidentConfigManager extends UiConfigManager {
         bridgeScenarioToRun(moduleProps);
     }
 
-    /** Reads a key the same way ConfigManager.init()'s own generic fallback eventually will
-     *  (apitest-commons ConfigManager.getValueForKeyAddToPropertiesMap's else branch): an
-     *  environment variable (Rancher's actual config-injection mechanism for this module — plain
-     *  ConfigMap/Secret env vars, not a mounted file) wins over whatever resident.properties has
-     *  baked in. Must be duplicated here rather than just reading moduleProps, because both
-     *  callers below run *before* ConfigManager.init() ever merges that env-var layer in. */
+    /** An env var (Rancher's actual config-injection mechanism) wins over resident.properties.
+     *  Duplicated here rather than just reading moduleProps, since both callers run before
+     *  ConfigManager.init() merges that env-var layer in. */
     private static String resolveWithEnvOverride(Map<String, Object> moduleProps, String key) {
         String envValue = System.getenv(key);
         if (envValue != null) return envValue;
@@ -78,9 +73,7 @@ public class ResidentConfigManager extends UiConfigManager {
     private static void validateRequiredConfig(Map<String, Object> moduleProps) {
         List<String> missing = new ArrayList<>();
         for (String key : REQUIRED_KEYS) {
-            // Logs presence/absence only, never the actual value (some of these are secrets) —
-            // lets a failed run's log answer "did the env var actually reach this container"
-            // without needing to exec into the pod separately.
+            // Logs presence/absence only, never the actual value (some of these are secrets).
             String envValue = System.getenv(key);
             Object fileValue = moduleProps.get(key);
             logger.info("Config check for '{}': env={}, resident.properties={}", key,
@@ -115,17 +108,10 @@ public class ResidentConfigManager extends UiConfigManager {
         }
     }
 
-    /** Bridges a scenarioToRun override into the system property CucumberHooks reads. A
-     *  -DscenarioToRun=... passed directly on the command line still wins over everything else.
-     *
-     *  Deliberately uses {@link #resolveWithEnvOverride} rather than {@code getproperty()}:
-     *  apitest-commons' ConfigManager.getproperty() is a plain map lookup with no generic
-     *  env-var fallback — only a hardcoded list of specific keys (eSignetbaseurl,
-     *  serverErrorsToMonitor, ...) ever get checked against the environment inside
-     *  ConfigManager.init(). "scenarioToRun" isn't one of them and isn't declared in any
-     *  .properties file either, so getproperty("scenarioToRun") would always return "" —
-     *  resolveWithEnvOverride() is what actually lets Rancher's env-var-only config injection
-     *  reach this key. */
+    /** Bridges a scenarioToRun override into the system property CucumberHooks reads; -D wins
+     *  over everything else. Uses {@link #resolveWithEnvOverride}, not {@code getproperty()}:
+     *  the latter has no generic env-var fallback, and "scenarioToRun" isn't declared in any
+     *  .properties file, so it would always return "". */
     private static void bridgeScenarioToRun(Map<String, Object> moduleProps) {
         if (System.getProperty(CucumberHooks.SCENARIO_FILTER_PROPERTY) != null) return;
         String scenarioToRun = resolveWithEnvOverride(moduleProps, "scenarioToRun");
@@ -135,13 +121,8 @@ public class ResidentConfigManager extends UiConfigManager {
         }
     }
 
-    // Rancher deployments configure this module entirely via env vars (confirmed in production —
-    // no mounted config is ever found), but local/Docker runs document mounting a real
-    // resident.properties over this classpath-baked, blank-default one (see README.md). Since
-    // this module now ships as a self-contained jar (see MainRunner), that classpath resource is
-    // frozen inside the jar at build time — entrypoint.sh can no longer override it by copying a
-    // file into a source tree that no longer exists at runtime. Reading the external file here
-    // instead keeps that documented workflow working.
+    // Rancher configures this module via env vars; local/Docker runs can still mount a real
+    // resident.properties here (frozen inside the jar otherwise) — see README.md.
     private static final String DEFAULT_RESIDENT_CONFIG_PATH = "/home/mosip/config/resident.properties";
 
     private static Map<String, Object> loadResidentProperties() {

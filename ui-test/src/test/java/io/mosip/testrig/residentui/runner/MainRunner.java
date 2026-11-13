@@ -11,16 +11,12 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import java.io.PrintWriter;
 
 /**
- * Executable entry point — runs the exact same suite as `mvn test` (ResidentTestRunner's
- * @Suite -> cucumber engine), but through the JUnit Platform Launcher API directly instead of
- * through Maven/Surefire.
+ * Executable entry point — runs the same suite as `mvn test`, through the JUnit Platform
+ * Launcher API directly instead of Maven/Surefire.
  *
- * Surefire runs tests in a forked child JVM whose environment it reconstructs by shelling out to
- * `env` and regex-parsing C-identifier-style KEY= lines — a hyphenated Rancher-injected variable
- * like keycloak-external-url doesn't match that regex and silently drops, even though every
- * underscore/camelCase-named variable survives. Running as a single `java -jar` process instead
- * means this JVM inherits the container's real OS environment directly, with no such fork in
- * between — exactly like apitest-resident's own `java -jar` entrypoint.
+ * Surefire forks a child JVM and reconstructs its environment by regex-parsing `env` output —
+ * a hyphenated var like keycloak-external-url doesn't match and silently drops. A single
+ * `java -jar` process inherits the container's real environment directly, with no such fork.
  */
 public class MainRunner {
 

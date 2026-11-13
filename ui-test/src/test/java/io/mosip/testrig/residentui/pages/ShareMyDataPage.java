@@ -35,12 +35,8 @@ public class ShareMyDataPage extends BasePage {
     public void selectGender()       { click("#gender", "Select the 'Gender' attribute"); }
     public void selectPhoto()        { click("#photo", "Select the 'Photo' attribute"); }
 
-    /**
-     * Opens the partner dropdown and picks its first option, retrying the whole open+pick
-     * sequence — mirrors UpdateMyDataPage.openAndPickFirstOption: these mat-select dropdowns can
-     * tear down and re-render their option panel mid-click. Logs each attempt as its own step so
-     * a failure here is reported against this locator, not a stale earlier step.
-     */
+    /** Mirrors UpdateMyDataPage.openAndPickFirstOption: mat-select dropdowns here can tear down
+     *  and re-render mid-click, so retry; logs its own step so a failure isn't blamed on a stale one. */
     public void selectPartner() {
         click("#partnerDetails", "Open the partner dropdown");
         RuntimeException lastFailure = null;
