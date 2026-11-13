@@ -7,13 +7,9 @@
     </formats>
     <includeBaseDirectory>false</includeBaseDirectory>
 
-    <!-- Most of what this suite runs lives under src/test (steps, pages, hooks, config,
-         MainRunner), but src/main/resources/config/Authorization/*.json (request templates
-         KernelAuthentication loads from the classpath by name, e.g. "config/Authorization/
-         request.json") and src/main/resources/config/application.properties are also required at
-         runtime. Under plain `mvn test`, both target/classes and target/test-classes land on the
-         test classpath automatically; this assembly has to list both explicitly or the fat jar
-         silently drops everything under src/main. -->
+    <!-- Both src/main (config/Authorization/*.json etc., loaded from the classpath by name) and
+         src/test (this suite's actual code) are needed at runtime — list both explicitly, or
+         the fat jar silently drops src/main. -->
     <fileSets>
         <fileSet>
             <directory>${project.build.outputDirectory}</directory>
@@ -48,11 +44,9 @@
         </dependencySet>
     </dependencySets>
 
-    <!-- Multiple dependency jars each register their own ServiceLoader provider under
-         META-INF/services/org.junit.platform.engine.TestEngine (junit-platform-suite-engine for
-         @Suite, cucumber-junit-platform-engine for @IncludeEngines("cucumber")) — without this
-         merge handler, unpacking plainly overwrites one file with the other and only one engine
-         survives, breaking discovery of either the suite or the scenarios inside it. -->
+    <!-- Two dependency jars each register their own TestEngine under the same
+         META-INF/services file (Suite + Cucumber) — without this merge handler, unpacking
+         overwrites one with the other and only one engine survives. -->
     <containerDescriptorHandlers>
         <containerDescriptorHandler>
             <handlerName>metaInf-services</handlerName>

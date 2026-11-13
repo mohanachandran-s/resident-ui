@@ -19,11 +19,8 @@ import java.io.UncheckedIOException;
 public class UpdateMyDataPage extends BasePage {
 
     private final VisualValidator visual;
-    // Loaded from the classpath, not a filesystem path: resolving "src/test/resources/..." relative
-    // to the JVM's working directory only works under mvn test/IDE, where that directory still
-    // exists — not when running the packaged jar (Docker/Rancher), whose working directory has no
-    // src/ tree. The file is already on the classpath either way (Maven copies it under
-    // target/test-classes, which the fat jar bundles), so reading it that way works everywhere.
+    // Loaded from the classpath, not a filesystem path — only resolves under mvn test/IDE; the
+    // packaged jar's working directory has no src/ tree, but the file is on its classpath either way.
     private static final String UPLOAD_FILE_RESOURCE = "/BulkUploadFiles/tonyId.png";
 
     public UpdateMyDataPage(Page page) {

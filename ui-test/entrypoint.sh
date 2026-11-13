@@ -9,12 +9,7 @@ if [ -z "$JAR_PATH" ]; then
     exit 1
 fi
 
-# A mounted config file (RESIDENT_CONFIG_PATH, default /home/mosip/config/resident.properties —
-# unused by Rancher in production, which configures this module entirely via env vars, but
-# documented for local/Docker runs) is read directly by ResidentConfigManager, not copied here,
-# since that classpath resource is frozen inside the jar at build time.
-#
-# exec replaces this shell with the java process, so it receives Kubernetes' signals directly.
-# Exit code propagates MainRunner's own (non-zero on any test failure), so Rancher sees a failed
-# Job.
+# RESIDENT_CONFIG_PATH (local/Docker only) is read directly by ResidentConfigManager, not copied
+# here — that classpath resource is frozen inside the jar at build time.
+# exec: this process inherits Kubernetes' signals directly, and its exit code is MainRunner's own.
 exec java -jar "$JAR_PATH"

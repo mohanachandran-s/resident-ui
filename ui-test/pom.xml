@@ -187,14 +187,9 @@
 					<argLine>-Dfile.encoding=UTF-8</argLine>
 				</configuration>
 			</plugin>
-			<!-- Builds the self-contained executable jar run in production via `java -jar` (see
-			     entrypoint.sh) — bundles src/test's compiled classes plus the full test-scope
-			     dependency graph (uitest-commons, Cucumber, JUnit Platform, Playwright, ...),
-			     since that's where this module's actual code lives. Assembly plugin, not shade:
-			     shade shades the main-scope project artifact and doesn't have a built-in way to
-			     pull in test-scope dependencies/classes; assembly's dependencySet scope="test"
-			     does. See src/assembly/jar-with-dependencies.xml for the ServiceLoader-merge
-			     handling two TestEngine providers (Suite + Cucumber) both need. -->
+			<!-- Builds the self-contained executable jar run in production (see entrypoint.sh).
+			     Assembly plugin, not shade: shade only bundles main-scope artifacts, but this
+			     module's code lives in src/test, which needs assembly's dependencySet scope="test". -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
@@ -231,11 +226,8 @@
 						<include>**/ResidentTestRunner.java</include>
 					</includes>
 				</configuration>
-				<!-- Surefire resolves its test-framework provider (surefire-junit-platform, here)
-				     dynamically at execution time, outside normal dependency resolution, so
-				     `mvn dependency:go-offline` (used at Docker build time to pre-warm this image's
-				     .m2 for later offline `mvn -o test`) never sees it. Declaring it explicitly as a
-				     plugin dependency puts it back in the normal graph. -->
+				<!-- Surefire resolves its JUnit5 provider dynamically, outside normal dependency
+				     resolution — declaring it explicitly puts it back in the graph. -->
 				<dependencies>
 					<dependency>
 						<groupId>org.apache.maven.surefire</groupId>
