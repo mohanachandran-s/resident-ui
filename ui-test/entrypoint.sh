@@ -9,9 +9,6 @@ if [ -z "$JAR_PATH" ]; then
     exit 1
 fi
 
-# RESIDENT_CONFIG_PATH (local/Docker only) is read directly by ResidentConfigManager, not copied
-# here — that classpath resource is frozen inside the jar at build time.
-# exec: this process inherits Kubernetes' signals directly. ResidentTestRunner's main() always
-# exits 0 regardless of scenario pass/fail — don't read this exit code as a test result; the
-# Extent report is.
+# exec: inherits Kubernetes' signals directly. Exit code is always 0 regardless of scenario
+# pass/fail (ResidentTestRunner.main()) — the Extent report is the result, not this exit code.
 exec java -jar "$JAR_PATH"
