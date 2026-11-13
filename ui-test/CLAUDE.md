@@ -38,10 +38,11 @@ docker run -e RESIDENT_CONFIG_PATH=/home/mosip/config/resident.properties \
   -v /path/to/local/resident.properties:/home/mosip/config/resident.properties \
   uitest-resident
 ```
-The image builds a self-contained executable jar at build time (`mvn package` — `MainRunner`
-driving the JUnit Platform Launcher directly, see Architecture below) and runs it with `java -jar`
-at container start; no Maven/Surefire invocation happens at runtime (see `MainRunner` for why that
-matters). In production, Rancher injects config entirely through plain environment variables
+The image builds a self-contained executable jar at build time (`mvn package` — `ResidentTestRunner`'s
+`main()` driving the JUnit Platform Launcher directly, see Architecture below) and runs it with
+`java -jar` at container start; no Maven/Surefire invocation happens at runtime (see
+`ResidentTestRunner.main()` for why that matters). In production, Rancher injects config entirely
+through plain environment variables
 (ConfigMaps/Secrets) — the `RESIDENT_CONFIG_PATH` mount above is a local/Docker convenience only;
 `ResidentConfigManager` reads that file directly if present (it can't be baked into the jar and
 overwritten the way entrypoint.sh used to under `mvn test`).
@@ -63,9 +64,9 @@ there if it's genuinely absent upstream, blank upstream, or an intentional overr
 
 ### Execution flow
 
-1. `ResidentTestRunner` (`runner/`) — JUnit5 `@Suite` entry point; no code, just annotations
-   selecting the Cucumber engine and the `features/` classpath resource. `MainRunner` (`runner/`)
-   is the production entry point (see Commands/Run in Docker) — it selects this class through the
+1. `ResidentTestRunner` (`runner/`) — JUnit5 `@Suite` entry point: annotations select the Cucumber
+   engine and the `features/` classpath resource for `mvn test`/an IDE run. Its `main()` is the
+   production entry point (see Commands/Run in Docker) — it drives the same suite through the
    JUnit Platform Launcher API directly, exactly what Surefire does internally under `mvn test`,
    just without the fork.
 2. `ResidentHooks` (`hooks/`) — suite lifecycle:
@@ -91,8 +92,7 @@ each other even though everything else runs in parallel.
 
 | Class | Role |
 |---|---|
-| `ResidentTestRunner` | JUnit5 Suite entry point (no logic) |
-| `MainRunner` | Production entry point — runs the suite via the JUnit Platform Launcher API (`java -jar`, no Maven/Surefire) |
+| `ResidentTestRunner` | JUnit5 Suite entry point, plus its `main()` as the `java -jar` production entry point (no Maven/Surefire) |
 | `ResidentHooks` | Suite/scenario lifecycle (`@BeforeAll`/`@Before`/`@BeforeStep`/`@After`/`@AfterAll`) |
 | `ResidentConfigManager` | Five-layer config loading; `scenarioToRun` bridging; typed getters |
 | `ResidentUtil` | Identity/UIN/VID generation against MOSIP APIs, via `apitest-commons`' `KernelAuthentication` |
